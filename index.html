@@ -2,9 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Wishlist App</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75'>🎁</text></svg>">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#667eea">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Wishpaper">
+    <meta name="description" content="Build your wishlist and export it as a beautiful PDF.">
+    <title>Wishpaper</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='75' font-size='75'>📝</text></svg>">
     <style>
         * {
             margin: 0;
@@ -386,6 +391,11 @@
         }
 
         @media (max-width: 768px) {
+            body {
+                padding: 12px;
+                overflow-x: hidden;
+            }
+
             .main-grid {
                 grid-template-columns: 1fr;
             }
@@ -396,6 +406,48 @@
 
             .form-section {
                 padding: 20px;
+            }
+
+            .wishlist-header {
+                flex-wrap: wrap;
+                gap: 12px;
+            }
+
+            .wishlist-item {
+                grid-template-columns: 32px 64px 1fr auto;
+                gap: 10px;
+                padding: 12px;
+            }
+
+            .item-image {
+                width: 64px;
+                height: 64px;
+            }
+
+            .btn-delete {
+                padding: 10px 14px;
+                font-size: 0.85em;
+            }
+
+            .btn-export {
+                width: 100%;
+                padding: 12px;
+                font-size: 1em;
+            }
+
+            .drag-handle {
+                font-size: 1.4em;
+                padding: 4px;
+                touch-action: none;
+            }
+
+            button, input, select, textarea {
+                font-size: 16px; /* prevents iOS zoom on focus */
+            }
+
+            .qty-btn {
+                width: 40px;
+                height: 40px;
             }
         }
 
@@ -421,8 +473,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🎁 My Wishlist</h1>
-            <p>Create and manage your wishlist, then export as a PDF</p>
+            <h1>📝 Wishpaper</h1>
+            <p>Build your wishlist and export it as a beautiful PDF</p>
         </div>
 
         <div class="main-grid">
@@ -527,6 +579,46 @@
         let wishlist = [];
         let currentImageData = null;
         let draggedItemId = null;
+        let touchDragId = null;
+        let touchClone = null;
+        let touchOffsetY = 0;
+
+        document.addEventListener('touchmove', (e) => {
+            if (!touchClone) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            touchClone.style.top = (touch.clientY - touchOffsetY) + 'px';
+            document.querySelectorAll('.wishlist-item').forEach(el => el.classList.remove('drag-over'));
+            const target = document.elementsFromPoint(touch.clientX, touch.clientY)
+                .find(el => el.classList.contains('wishlist-item') && parseInt(el.dataset.itemId) !== touchDragId);
+            if (target) target.classList.add('drag-over');
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (!touchClone) return;
+            const touch = e.changedTouches[0];
+            touchClone.remove();
+            touchClone = null;
+            document.querySelectorAll('.wishlist-item').forEach(el => {
+                el.classList.remove('drag-over');
+                el.style.opacity = '';
+            });
+            const target = document.elementsFromPoint(touch.clientX, touch.clientY)
+                .find(el => el.classList.contains('wishlist-item') && parseInt(el.dataset.itemId) !== touchDragId);
+            if (target) reorderItems(touchDragId, parseInt(target.dataset.itemId));
+            touchDragId = null;
+        });
+
+        document.addEventListener('touchcancel', () => {
+            if (!touchClone) return;
+            touchClone.remove();
+            touchClone = null;
+            document.querySelectorAll('.wishlist-item').forEach(el => {
+                el.classList.remove('drag-over');
+                el.style.opacity = '';
+            });
+            touchDragId = null;
+        });
 
         const form = document.getElementById('wishlistForm');
         const wishlistContainer = document.getElementById('wishlistContainer');
@@ -648,6 +740,21 @@
                     </div>
                     <button class="btn-delete" onclick="deleteItem(${item.id})">Delete</button>
                 `;
+
+                // Touch drag — initiated from the drag handle only
+                const dragHandle = itemEl.querySelector('.drag-handle');
+                dragHandle.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = itemEl.getBoundingClientRect();
+                    touchOffsetY = touch.clientY - rect.top;
+                    touchDragId = item.id;
+                    touchClone = itemEl.cloneNode(true);
+                    touchClone.style.cssText = `position:fixed;top:${rect.top}px;left:${rect.left}px;width:${rect.width}px;margin:0;z-index:1000;opacity:0.9;pointer-events:none;box-shadow:0 8px 24px rgba(102,126,234,0.35);border-radius:8px;`;
+                    document.body.appendChild(touchClone);
+                    itemEl.style.opacity = '0.35';
+                    if (navigator.vibrate) navigator.vibrate(40);
+                }, { passive: false });
 
                 itemEl.addEventListener('dragstart', (e) => {
                     draggedItemId = item.id;

@@ -1,4 +1,4 @@
-# Wishlist App
+# Wishpaper
 
 A zero-dependency wishlist manager that runs entirely in the browser. Build your wishlist, reorder it, and export it as a clean PDF — no installs, no accounts, no server.
 
@@ -6,19 +6,33 @@ A zero-dependency wishlist manager that runs entirely in the browser. Build your
 
 - **Add items** with a name, price, note, quantity, priority, category, product link, and an optional image
 - **Image support** — upload a file or paste directly from the clipboard
-- **Drag-and-drop reordering** — arrange items in any order
+- **Drag-and-drop reordering** — works with both mouse and touch (drag from the handle)
 - **Priority badges** — Low, Medium, or High, each with its own colour
 - **Categories** — Electronics, Books, Clothing, Home, Sports, Gaming, Other
-- **PDF export** — opens the browser's print dialog (Save as PDF) with items laid out as clean horizontal cards; no new tab opened
+- **PDF export** — opens the browser's print dialog inline (no new tab); items are laid out as clean horizontal cards
 - **Persistent storage** — wishlist is saved to `localStorage` and survives page refreshes
+- **Mobile-friendly** — responsive layout, touch drag-and-drop, and prevents iOS zoom on input focus
 
 ## Usage
 
-Download `wishlist.html` and open it in any modern browser. No build step, no dependencies, no internet connection required.
+### Hosted
+
+Visit the live site at `https://<your-username>.github.io/wishpaper`
+
+### Local
+
+Download `index.html` and open it in any modern browser. No build step, no dependencies, no internet connection required.
+
+## Hosting on GitHub Pages
+
+1. Push this repo to GitHub
+2. Go to **Settings → Pages**
+3. Set the source to the `main` branch, root folder
+4. GitHub will publish it at `https://<your-username>.github.io/<repo-name>`
 
 ## PDF Export
 
-Clicking **Export PDF** triggers the browser's native print dialog directly over the page. Each item is rendered as a full-width card with its image on the left and details on the right. From the dialog, choose **Save as PDF** to get a file.
+Clicking **Export PDF** triggers the browser's native print dialog over the current page. Each item renders as a full-width card with its image on the left and details on the right. Choose **Save as PDF** in the dialog to download a file.
 
 ## Tech
 
