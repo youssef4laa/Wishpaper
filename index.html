@@ -861,17 +861,40 @@
 <meta charset="UTF-8">
 <title>Wishlist</title>
 <style>
-  @page { size: A4 portrait; margin: 14mm 12mm; }
+  @page { size: A4 portrait; margin: 0; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
     color: #1a1a1a; background: white; font-size: 13px;
+    padding: 16mm 15mm;
+  }
+
+  /* ── Border frame (repeats on every page) ── */
+  .page-frame {
+    position: fixed;
+    inset: 5mm;
+    border: 3px solid transparent;
+    background:
+      linear-gradient(white, white) padding-box,
+      linear-gradient(135deg, #667eea 0%, #a78bfa 50%, #764ba2 100%) border-box;
+    border-radius: 12px;
+    pointer-events: none;
+    -webkit-print-color-adjust: exact; print-color-adjust: exact;
+  }
+  .page-frame::after {
+    content: '';
+    position: absolute;
+    inset: 4px;
+    border: 1px solid rgba(102, 126, 234, 0.18);
+    border-radius: 9px;
   }
 
   .items-list {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    position: relative;
+    z-index: 1;
   }
 
   /* ── Card ── */
@@ -963,6 +986,7 @@
 </style>
 </head>
 <body>
+  <div class="page-frame"></div>
   <div class="items-list">${itemsHTML}</div>
 </body>
 </html>`;
