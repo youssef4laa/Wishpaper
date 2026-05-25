@@ -267,6 +267,26 @@
             box-shadow: none;
         }
 
+        .btn-import {
+            background: white;
+            color: #667eea;
+            padding: 10px 16px;
+            border-radius: 8px;
+            border: 2px solid #667eea;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9em;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            width: fit-content;
+        }
+
+        .btn-import:hover {
+            background: #667eea;
+            color: white;
+            transform: translateY(-1px);
+        }
+
         .wishlist-items {
             display: flex;
             flex-direction: column;
@@ -590,6 +610,8 @@
             <div class="wishlist-section">
                 <div class="wishlist-header">
                     <h2>Wishlist (<span id="itemCount">0</span>)</h2>
+                    <button class="btn-import" id="importBtn">📥 Import</button>
+                    <input type="file" id="importInput" accept=".json" style="display:none">
                     <button class="btn-export" id="exportBtn" disabled>📄 Export PDF</button>
                 </div>
                 <div id="wishlistContainer" class="wishlist-items"></div>
@@ -1111,6 +1133,31 @@
             iframe.contentDocument.close();
             iframe.contentWindow.onafterprint = () => iframe.remove();
             setTimeout(() => { iframe.contentWindow.focus(); iframe.contentWindow.print(); }, 400);
+        });
+
+        // Import from JSON
+        const importBtn = document.getElementById('importBtn');
+        const importInput = document.getElementById('importInput');
+
+        importBtn.addEventListener('click', () => importInput.click());
+
+        importInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (ev) => {
+                try {
+                    const imported = JSON.parse(ev.target.result);
+                    if (!Array.isArray(imported)) throw new Error('Invalid format');
+                    wishlist = imported;
+                    renderWishlist();
+                    saveToStorage();
+                    importInput.value = '';
+                } catch {
+                    alert('Could not read the file — make sure it\'s a Wishpaper JSON export.');
+                }
+            };
+            reader.readAsText(file);
         });
 
         // Initial render
