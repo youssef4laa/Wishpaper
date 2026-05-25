@@ -281,7 +281,7 @@
             border-radius: 8px;
             box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
             display: grid;
-            grid-template-columns: 24px 80px 1fr 70px;
+            grid-template-columns: 24px 80px 1fr auto;
             gap: 15px;
             align-items: start;
             transition: all 0.3s;
@@ -364,11 +364,33 @@
             border: 2px dashed #667eea;
         }
 
+        .item-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .btn-edit {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            height: fit-content;
+        }
+
+        .btn-edit:hover {
+            background: #5568d3;
+        }
+
         .btn-delete {
             background: #ef4444;
             color: white;
             border: none;
-            padding: 8px 12px;
+            padding: 8px 10px;
             border-radius: 4px;
             cursor: pointer;
             font-weight: 600;
@@ -480,7 +502,7 @@
         <div class="main-grid">
             <!-- Form Section -->
             <div class="form-section">
-                <h2>Add Item</h2>
+                <h2 id="formTitle">Add Item</h2>
                 <form id="wishlistForm">
                     <div class="form-group">
                         <label for="productLink">Product Link (optional)</label>
@@ -579,6 +601,21 @@
         let wishlist = [];
         let currentImageData = null;
         let draggedItemId = null;
+        let editingItemId = null;
+        let db = null;
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const req = indexedDB.open('WishpaperDB', 1);
+                req.onupgradeneeded = (e) => {
+                    if (!e.target.result.objectStoreNames.contains('data')) {
+                        e.target.result.createObjectStore('data');
+                    }
+                };
+                req.onsuccess = (e) => { db = e.target.result; resolve(); };
+                req.onerror = () => reject(req.error);
+            });
+        }
         let touchDragId = null;
         let touchClone = null;
         let touchOffsetY = 0;
@@ -630,11 +667,26 @@
         const quantityInput = document.getElementById('quantity');
 
         // Image upload handling
+        function compressImage(dataUrl, maxDim = 800, quality = 0.85) {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+                    const canvas = document.createElement('canvas');
+                    canvas.width = Math.round(img.width * scale);
+                    canvas.height = Math.round(img.height * scale);
+                    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', quality));
+                };
+                img.src = dataUrl;
+            });
+        }
+
         function handleImageFile(file) {
             if (file && file.type.startsWith('image/')) {
                 const reader = new FileReader();
-                reader.onload = (event) => {
-                    currentImageData = event.target.result;
+                reader.onload = async (event) => {
+                    currentImageData = await compressImage(event.target.result);
                     imagePreview.innerHTML = `<img src="${currentImageData}" alt="preview">`;
                 };
                 reader.readAsDataURL(file);
@@ -684,12 +736,22 @@
             }
         };
 
+        // Clears only our extra state — never calls form.reset() to avoid an infinite loop
+        function clearFormState() {
+            currentImageData = null;
+            imagePreview.textContent = 'None';
+            unlimitedCheckbox.checked = false;
+            quantityInput.disabled = false;
+            editingItemId = null;
+            document.getElementById('formTitle').textContent = 'Add Item';
+            document.querySelector('.btn-add').textContent = 'Add Item';
+        }
+
         // Form submission
         form.addEventListener('submit', (e) => {
             e.preventDefault();
 
-            const item = {
-                id: Date.now(),
+            const itemData = {
                 name: document.getElementById('name').value,
                 productLink: document.getElementById('productLink').value,
                 website: document.getElementById('website').value,
@@ -701,14 +763,22 @@
                 image: currentImageData
             };
 
-            wishlist.push(item);
+            if (editingItemId !== null) {
+                const index = wishlist.findIndex(i => i.id === editingItemId);
+                if (index !== -1) wishlist[index] = { ...wishlist[index], ...itemData };
+            } else {
+                wishlist.push({ id: Date.now(), ...itemData });
+            }
+
             renderWishlist();
             saveToStorage();
             form.reset();
-            currentImageData = null;
-            imagePreview.textContent = 'None';
-            unlimitedCheckbox.checked = false;
-            quantityInput.disabled = false;
+            clearFormState();
+        });
+
+        // The native reset (Clear button) only needs to clean up our extra state
+        form.addEventListener('reset', () => {
+            setTimeout(clearFormState, 0);
         });
 
         function renderWishlist() {
@@ -738,7 +808,10 @@
                         ${item.priority ? `<div class="item-detail"><strong>Priority:</strong> ${item.priority}</div>` : ''}
                         ${item.quantity ? `<div class="item-detail"><strong>Qty:</strong> ${item.quantity}</div>` : ''}
                     </div>
-                    <button class="btn-delete" onclick="deleteItem(${item.id})">Delete</button>
+                    <div class="item-actions">
+                        <button class="btn-edit" onclick="editItem(${item.id})">✏️</button>
+                        <button class="btn-delete" onclick="deleteItem(${item.id})">Delete</button>
+                    </div>
                 `;
 
                 // Touch drag — initiated from the drag handle only
@@ -796,6 +869,39 @@
             saveToStorage();
         };
 
+        window.editItem = (id) => {
+            const item = wishlist.find(i => i.id === id);
+            if (!item) return;
+            editingItemId = id;
+
+            document.getElementById('productLink').value = item.productLink || '';
+            document.getElementById('name').value = item.name || '';
+            document.getElementById('website').value = item.website || '';
+            document.getElementById('price').value = item.price || '';
+            document.getElementById('note').value = item.note || '';
+            document.getElementById('priority').value = item.priority || '';
+            document.getElementById('category').value = item.category || '';
+
+            if (item.quantity === 'Unlimited') {
+                unlimitedCheckbox.checked = true;
+                quantityInput.disabled = true;
+                quantityInput.value = '1';
+            } else {
+                unlimitedCheckbox.checked = false;
+                quantityInput.disabled = false;
+                quantityInput.value = item.quantity || '1';
+            }
+
+            currentImageData = item.image || null;
+            imagePreview.innerHTML = currentImageData
+                ? `<img src="${currentImageData}" alt="preview">`
+                : 'None';
+
+            document.getElementById('formTitle').textContent = 'Edit Item';
+            document.querySelector('.btn-add').textContent = 'Update Item';
+            document.querySelector('.form-section').scrollIntoView({ behavior: 'smooth' });
+        };
+
         window.reorderItems = (fromId, toId) => {
             const fromIndex = wishlist.findIndex(item => item.id === fromId);
             const toIndex = wishlist.findIndex(item => item.id === toId);
@@ -808,18 +914,24 @@
             }
         };
 
-        // Save to localStorage
+        // Save to IndexedDB (~100MB+ capacity vs localStorage's 5MB cap)
         function saveToStorage() {
-            localStorage.setItem('wishlist', JSON.stringify(wishlist));
+            if (!db) return;
+            const tx = db.transaction('data', 'readwrite');
+            tx.objectStore('data').put(JSON.stringify(wishlist), 'wishlist');
         }
 
-        // Load from localStorage
         function loadFromStorage() {
-            const stored = localStorage.getItem('wishlist');
-            if (stored) {
-                wishlist = JSON.parse(stored);
-                renderWishlist();
-            }
+            return new Promise((resolve) => {
+                if (!db) { resolve(); return; }
+                const tx = db.transaction('data', 'readonly');
+                const req = tx.objectStore('data').get('wishlist');
+                req.onsuccess = () => {
+                    if (req.result) wishlist = JSON.parse(req.result);
+                    resolve();
+                };
+                req.onerror = () => resolve();
+            });
         }
 
         // Export to PDF
@@ -1002,10 +1114,7 @@
         });
 
         // Initial render
-        loadFromStorage();
-        if (wishlist.length === 0) {
-            renderWishlist();
-        }
+        initDB().then(() => loadFromStorage()).then(() => renderWishlist());
     </script>
 </body>
 </html>
